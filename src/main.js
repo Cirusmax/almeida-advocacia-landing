@@ -37,11 +37,30 @@ revealEls.forEach((el) => io.observe(el));
 const yearEl = document.getElementById('year');
 if (yearEl) yearEl.textContent = new Date().getFullYear();
 
-// Contact form (front-end only for now — no backend wired yet)
+// Contact form — builds a WhatsApp message from the filled fields
+const WHATSAPP_NUMBER = '553299055427';
 const form = document.getElementById('contactForm');
 const note = document.getElementById('formNote');
 form?.addEventListener('submit', (e) => {
   e.preventDefault();
-  note.textContent = 'Recebemos sua mensagem! Em breve entramos em contato.';
+  const data = new FormData(form);
+  const nome = data.get('nome') || '';
+  const sobrenome = data.get('sobrenome') || '';
+  const email = data.get('email') || '';
+  const telefone = data.get('telefone') || '';
+  const mensagem = data.get('mensagem') || '';
+  const podeLigar = data.get('pode_ligar') ? 'Sim' : 'Não';
+
+  const text = [
+    `Olá! Me chamo ${nome} ${sobrenome}.`,
+    `Email: ${email}`,
+    `Telefone: ${telefone}`,
+    `Podem me ligar? ${podeLigar}`,
+    '',
+    `Meu caso: ${mensagem}`,
+  ].join('\n');
+
+  note.textContent = 'Abrindo o WhatsApp...';
+  window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
   form.reset();
 });
