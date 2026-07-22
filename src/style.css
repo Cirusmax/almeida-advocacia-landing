@@ -494,6 +494,15 @@ h1 .highlight {
   font-weight: 600;
 }
 
+/* ===== Legal pages ===== */
+.legal { padding: 60px 0 100px; }
+.legal h1 { font-size: clamp(2rem, 4vw, 2.6rem); margin-bottom: 0.4em; }
+.legal h2 { font-size: 1.25rem; margin-top: 2em; }
+.legal p, .legal li { font-size: 0.98rem; }
+.legal ul { padding-left: 1.2em; margin: 0 0 1em; }
+.legal li { margin-bottom: 0.5em; }
+.legal a { color: var(--periwinkle); text-decoration: underline; }
+
 /* ===== Footer ===== */
 .footer { padding: 50px 0 34px; border-top: 1px solid var(--border); }
 .footer__inner {
