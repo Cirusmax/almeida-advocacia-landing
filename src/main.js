@@ -38,7 +38,7 @@ const yearEl = document.getElementById('year');
 if (yearEl) yearEl.textContent = new Date().getFullYear();
 
 // Contact form — builds a WhatsApp message from the filled fields
-const WHATSAPP_NUMBER = '553299055427';
+const WHATSAPP_NUMBER = '5532999055427';
 const form = document.getElementById('contactForm');
 const note = document.getElementById('formNote');
 form?.addEventListener('submit', (e) => {
