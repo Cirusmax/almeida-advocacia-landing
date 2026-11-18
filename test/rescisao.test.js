@@ -1,0 +1,359 @@
+import assert from "node:assert/strict";
+import { describe, test } from "node:test";
+import {
+  anosCompletos,
+  anosDeServico,
+  avosDeServico,
+  calcularRescisao,
+  decimoTerceiroProporcional,
+  diasDeAviso,
+  feriasProporcionais,
+  lerEntrada,
+  mesesCivisComQuinzeDias,
+  parseDataLocal,
+  saldoDeSalario,
+  somarAnos,
+  somarMeses,
+} from "../src/calculator/vendor/rescisao.js";
+
+/** @param {string} texto */
+function data(texto) {
+  const valor = parseDataLocal(texto);
+  if (!valor) throw new Error(`data inválida no teste: ${texto}`);
+  return valor;
+}
+
+/** @param {Record<string, string>} campos */
+function entrada(campos) {
+  const leitura = lerEntrada(new URLSearchParams(campos));
+  if (!leitura.ok) throw new Error(leitura.erros.join(" "));
+  return leitura.entrada;
+}
+
+/** Total antes de INSS e IRRF, para conferir as regras que não envolvem impostos. @param {import("../src/calculator/vendor/rescisao.js").Resultado} r */
+const semImpostos = (r) => Math.round((r.total + r.impostos) * 100) / 100;
+/** @param {import("../src/calculator/vendor/rescisao.js").Resultado} r */
+const descontosSemImpostos = (r) => r.descontos.filter((d) => !/^(INSS|IRRF)/.test(d.titulo));
+
+/** @param {import("../src/calculator/vendor/rescisao.js").Resultado} resultado @param {string} titulo */
+function valorDe(resultado, titulo) {
+  return [...resultado.verbas, ...resultado.fgts].find((v) => v.titulo === titulo)?.valor;
+}
+
+describe("datas", () => {
+  test("rejeita datas inexistentes", () => {
+    assert.equal(parseDataLocal("2025-02-31"), null);
+    assert.equal(parseDataLocal("31/01/2025"), null);
+    assert.equal(parseDataLocal("0025-01-01"), null);
+  });
+
+  test("somarMeses não acumula deslocamento em meses curtos", () => {
+    assert.deepEqual(somarMeses(data("2025-01-31"), 1), data("2025-02-28"));
+    assert.deepEqual(somarMeses(data("2025-01-31"), 2), data("2025-03-31"));
+  });
+
+  test("anos completos viram no aniversário da admissão", () => {
+    assert.equal(anosCompletos(data("2020-03-15"), data("2025-03-14")), 4);
+    assert.equal(anosCompletos(data("2020-03-15"), data("2025-03-15")), 5);
+  });
+
+  test("aniversário de 29/02 em ano não bissexto vence em 01/03", () => {
+    assert.deepEqual(somarAnos(data("2020-02-29"), 1), data("2021-03-01"));
+    assert.equal(anosCompletos(data("2020-02-29"), data("2021-02-28")), 0);
+    assert.equal(anosCompletos(data("2020-02-29"), data("2021-03-01")), 1);
+    assert.equal(anosCompletos(data("2020-02-29"), data("2024-02-29")), 4);
+    assert.equal(anosDeServico(data("2020-02-29"), data("2021-02-27")), 0);
+    assert.equal(anosDeServico(data("2020-02-29"), data("2021-02-28")), 1);
+  });
+
+  test("anos de serviço contam o último dia trabalhado", () => {
+    assert.equal(anosDeServico(data("2020-03-15"), data("2025-03-13")), 4);
+    assert.equal(anosDeServico(data("2020-03-15"), data("2025-03-14")), 5);
+  });
+});
+
+describe("saldo de salário", () => {
+  test("conta os dias do mês do desligamento", () => {
+    assert.deepEqual(saldoDeSalario(3000, data("2020-01-01"), data("2025-03-10")), { dias: 10, valor: 1000 });
+  });
+
+  test("mês inteiro vale 30 dias, mesmo em fevereiro ou em meses de 31", () => {
+    assert.equal(saldoDeSalario(3000, data("2020-01-01"), data("2025-02-28")).dias, 30);
+    assert.equal(saldoDeSalario(3000, data("2020-01-01"), data("2025-01-31")).dias, 30);
+  });
+
+  test("admissão no próprio mês limita os dias", () => {
+    assert.equal(saldoDeSalario(3000, data("2025-03-05"), data("2025-03-20")).dias, 16);
+  });
+});
+
+describe("aviso prévio", () => {
+  const contrato = { s: "1000", f: "0", d: "2025-06-01" };
+
+  test("30 dias mais 3 por ano completo, até 90", () => {
+    assert.equal(diasDeAviso(entrada({ ...contrato, m: "sem_justa_causa", av: "indenizado", a: "2020-01-01" })), 45);
+    assert.equal(diasDeAviso(entrada({ ...contrato, m: "sem_justa_causa", av: "indenizado", a: "2000-01-01" })), 90);
+  });
+
+  test("pedido de demissão não tem proporcionalidade", () => {
+    assert.equal(diasDeAviso(entrada({ ...contrato, m: "pedido_demissao", av: "trabalhado", a: "2000-01-01" })), 30);
+  });
+});
+
+describe("avos", () => {
+  test("13º usa meses civis com 15 dias ou mais", () => {
+    assert.equal(mesesCivisComQuinzeDias(data("2025-01-17"), data("2025-03-14")), 2);
+  });
+
+  test("férias contam meses a partir do período aquisitivo", () => {
+    assert.equal(avosDeServico(data("2025-01-20"), data("2025-03-10")), 2);
+    assert.equal(avosDeServico(data("2025-01-20"), data("2025-02-19")), 1);
+    assert.equal(avosDeServico(data("2025-01-20"), data("2025-01-10")), 0);
+  });
+
+  test("13º separa os avos quando a projeção atravessa o ano", () => {
+    const decimo = decimoTerceiroProporcional(1200, data("2020-01-01"), data("2025-12-10"), data("2026-01-24"));
+    assert.deepEqual(decimo.porAno, [{ ano: 2025, avos: 12 }, { ano: 2026, avos: 1 }]);
+    assert.equal(decimo.valor, 1300);
+  });
+
+  test("período aquisitivo iniciado em 29/02 só se completa em 01/03", () => {
+    const vespera = feriasProporcionais(3000, data("2020-02-29"), data("2021-02-27"), data("2021-02-27"));
+    assert.equal(vespera.completouPeriodo, false);
+    const ultimoDia = feriasProporcionais(3000, data("2020-02-29"), data("2021-02-28"), data("2021-02-28"));
+    assert.equal(ultimoDia.completouPeriodo, false);
+    assert.equal(ultimoDia.avos, 0);
+  });
+
+  test("projeção que completa o período aquisitivo gera férias integrais", () => {
+    const ferias = feriasProporcionais(3000, data("2024-03-01"), data("2025-02-10"), data("2025-03-12"));
+    assert.equal(ferias.completouPeriodo, true);
+    assert.equal(ferias.valorIntegral, 4000);
+    assert.equal(ferias.avos, 0);
+  });
+});
+
+describe("calcularRescisao", () => {
+  const contrato = { s: "3000", a: "2022-05-10", d: "2025-08-20", f: "10000", p: "on" };
+
+  test("sem justa causa com aviso indenizado projetado", () => {
+    const r = calcularRescisao(entrada({ ...contrato, m: "sem_justa_causa", av: "indenizado" }));
+    assert.equal(r.diasAviso, 39);
+    assert.deepEqual(r.dataEfetiva, data("2025-09-28"));
+    assert.equal(valorDe(r, "Saldo de salário"), 2000);
+    assert.equal(valorDe(r, "Aviso prévio indenizado"), 3900);
+    assert.equal(valorDe(r, "13º salário proporcional"), 2250);
+    assert.equal(valorDe(r, "Férias proporcionais + 1/3"), 1666.67);
+    assert.equal(valorDe(r, "FGTS sobre verbas rescisórias (8%)"), 652);
+    assert.equal(valorDe(r, "Multa de 40% do FGTS"), 4260.8);
+    assert.equal(semImpostos(r), 9816.67);
+    assert.equal(r.totalFGTS, 4912.8);
+  });
+
+  test("multa e depósito do FGTS ficam fora do valor a receber", () => {
+    const r = calcularRescisao(entrada({ ...contrato, m: "sem_justa_causa", av: "indenizado" }));
+    assert.equal(r.verbas.some((v) => v.titulo.includes("FGTS")), false);
+    assert.equal(r.bruto, 9816.67);
+  });
+
+  test("férias indenizadas não entram na base do FGTS rescisório", () => {
+    const r = calcularRescisao(entrada({ m: "sem_justa_causa", av: "trabalhado", s: "3000", a: "2020-03-15", d: "2025-03-14", f: "0", fv: "1" }));
+    assert.ok((valorDe(r, "Férias vencidas + 1/3") ?? 0) > 0);
+    assert.equal(valorDe(r, "FGTS sobre verbas rescisórias (8%)"), (1400 + 500) * 0.08);
+  });
+
+  test("pedido de demissão deposita FGTS rescisório sem multa", () => {
+    const r = calcularRescisao(entrada({ m: "pedido_demissao", av: "trabalhado", s: "3000", a: "2024-06-01", d: "2025-03-15" }));
+    assert.equal(valorDe(r, "FGTS sobre verbas rescisórias (8%)"), (1500 + 750) * 0.08);
+    assert.equal(r.fgts.some((v) => v.titulo.startsWith("Multa")), false);
+  });
+
+  test("sem projeção os avos param no último dia trabalhado", () => {
+    const r = calcularRescisao(entrada({ ...contrato, p: "", m: "sem_justa_causa", av: "indenizado" }));
+    assert.deepEqual(r.dataEfetiva, data("2025-08-20"));
+    assert.equal(valorDe(r, "13º salário proporcional"), 2000);
+  });
+
+  test("acordo paga metade do aviso e multa de 20%", () => {
+    const r = calcularRescisao(entrada({ ...contrato, m: "acordo", av: "indenizado" }));
+    assert.equal(valorDe(r, "Aviso prévio indenizado"), 1950);
+    assert.equal(valorDe(r, "FGTS sobre verbas rescisórias (8%)"), 496);
+    assert.equal(valorDe(r, "Multa de 20% do FGTS"), 2099.2);
+    assert.equal(semImpostos(r), 7866.67);
+  });
+
+  test("aviso trabalhado não entra no total", () => {
+    const r = calcularRescisao(entrada({ ...contrato, m: "sem_justa_causa", av: "trabalhado" }));
+    assert.equal(valorDe(r, "Aviso prévio indenizado"), undefined);
+    assert.ok(r.observacoes.some((o) => o.startsWith("Aviso trabalhado de 39 dias")));
+  });
+
+  test("pedido de demissão com aviso não cumprido desconta um salário", () => {
+    const r = calcularRescisao(entrada({ m: "pedido_demissao", av: "nao_cumprido", s: "3000", a: "2024-06-01", d: "2025-03-15" }));
+    assert.equal(valorDe(r, "Saldo de salário"), 1500);
+    assert.equal(valorDe(r, "13º salário proporcional"), 750);
+    assert.equal(valorDe(r, "Férias proporcionais + 1/3"), 3333.33);
+    assert.equal(r.fgts.some((v) => v.titulo.startsWith("Multa")), false);
+    assert.equal(r.descontos[0]?.valor, 3000);
+    assert.equal(semImpostos(r), 2583.33);
+  });
+
+  test("descontos nunca passam do valor das verbas", () => {
+    const r = calcularRescisao(entrada({ m: "pedido_demissao", av: "nao_cumprido", s: "3000", a: "2025-03-01", d: "2025-03-05" }));
+    assert.equal(r.bruto, 500);
+    assert.equal(r.total, 0);
+    assert.ok(r.observacoes.some((o) => o.includes("limitados")));
+  });
+
+  test("justa causa paga só saldo e férias vencidas, com o período antigo em dobro", () => {
+    const r = calcularRescisao(entrada({ m: "justa_causa", av: "nenhum", s: "3000", a: "2020-01-01", d: "2025-03-15", fv: "2" }));
+    assert.deepEqual(r.verbas.map((v) => v.valor), [1500, 4000, 8000]);
+    assert.equal(r.diasAviso, 0);
+    assert.equal(semImpostos(r), 13500);
+  });
+
+  test("sair na véspera ou no aniversário da admissão não muda aviso nem férias", () => {
+    const base = { m: "sem_justa_causa", av: "trabalhado", s: "3000", a: "2020-03-15", f: "0", fv: "1" };
+    const vespera = calcularRescisao(entrada({ ...base, d: "2025-03-14" }));
+    const aniversario = calcularRescisao(entrada({ ...base, d: "2025-03-15" }));
+    assert.equal(vespera.diasAviso, 45);
+    assert.equal(aniversario.diasAviso, 45);
+    assert.equal(valorDe(vespera, "Férias integrais + 1/3"), undefined);
+    assert.equal(valorDe(vespera, "Férias vencidas + 1/3"), 4000);
+    assert.equal(valorDe(aniversario, "Férias vencidas + 1/3"), 4000);
+  });
+
+  test("adiantamento de 13º é abatido do 13º e sai da base do FGTS rescisório", () => {
+    const r = calcularRescisao(entrada({ ...contrato, m: "sem_justa_causa", av: "indenizado", ad: "1000" }));
+    assert.deepEqual(descontosSemImpostos(r).map((d) => d.valor), [1000]);
+    assert.equal(semImpostos(r), 8816.67);
+    assert.equal(valorDe(r, "FGTS sobre verbas rescisórias (8%)"), 572);
+    assert.equal(valorDe(r, "Multa de 40% do FGTS"), 4228.8);
+  });
+
+  test("adiantamento maior que o 13º compensa o excedente nas demais verbas", () => {
+    const r = calcularRescisao(entrada({ m: "justa_causa", av: "nenhum", s: "3000", a: "2020-01-01", d: "2025-03-15", ad: "1500" }));
+    assert.deepEqual(descontosSemImpostos(r).map((d) => [d.titulo, d.valor]), [["Adiantamento de 13º excedente", 1500]]);
+    assert.equal(r.total, 0);
+  });
+
+  test("compensações fora do 13º ficam limitadas a um salário (art. 477, §5º)", () => {
+    const r = calcularRescisao(entrada({ m: "pedido_demissao", av: "nao_cumprido", s: "3000", a: "2024-06-01", d: "2025-03-15", ad: "2000" }));
+    assert.deepEqual(descontosSemImpostos(r).map((d) => d.valor), [750, 1250, 3000]);
+    assert.equal(r.bruto, 5583.33);
+    assert.equal(semImpostos(r), 1833.33);
+    assert.ok(r.observacoes.some((o) => o.includes("art. 477, §5º")));
+  });
+});
+
+describe("lerEntrada", () => {
+  test("lista todos os campos obrigatórios em falta", () => {
+    const leitura = lerEntrada(new URLSearchParams({ m: "sem_justa_causa", av: "indenizado" }));
+    assert.equal(leitura.ok, false);
+    if (!leitura.ok) {
+      assert.deepEqual(leitura.erros, [
+        "Informe um salário maior que zero.",
+        "Informe um saldo de FGTS válido (zero ou maior).",
+        "Informe a data de admissão.",
+        "Informe a data de desligamento.",
+      ]);
+    }
+  });
+
+  test("recusa aviso incompatível com a modalidade", () => {
+    const leitura = lerEntrada(new URLSearchParams({ m: "justa_causa", av: "indenizado", s: "1000", a: "2020-01-01", d: "2025-01-01" }));
+    assert.equal(leitura.ok, false);
+  });
+
+  test("recusa mais férias vencidas do que anos de contrato", () => {
+    const leitura = lerEntrada(new URLSearchParams({ m: "pedido_demissao", av: "trabalhado", s: "1000", a: "2024-06-01", d: "2025-03-01", fv: "1" }));
+    assert.equal(leitura.ok, false);
+  });
+
+  test("recusa valores infinitos vindos do link", () => {
+    const base = { m: "sem_justa_causa", av: "indenizado", s: "1000", a: "2020-01-01", d: "2025-01-01", f: "0" };
+    assert.equal(lerEntrada(new URLSearchParams({ ...base, f: "Infinity" })).ok, false);
+    assert.equal(lerEntrada(new URLSearchParams({ ...base, ad: "Infinity" })).ok, false);
+  });
+
+  test("aceita valores com ponto ou vírgula e até dois decimais", () => {
+    const base = { m: "sem_justa_causa", av: "indenizado", a: "2020-01-01", d: "2025-01-01", f: "0" };
+    assert.equal(entrada({ ...base, s: "1500.5" }).salario, 1500.5);
+    assert.equal(entrada({ ...base, s: "1500,25" }).salario, 1500.25);
+    assert.equal(entrada({ ...base, s: "1000", ad: "" }).adiantamento13, 0);
+  });
+
+  test("recusa formatos numéricos que não são valores em reais", () => {
+    const base = { m: "sem_justa_causa", av: "indenizado", s: "1000", a: "2020-01-01", d: "2025-01-01", f: "0" };
+    for (const valor of ["1e3", "0x10", "-5", "1.234", "1.000,00", ".5", "5.", " 1 0"]) {
+      assert.equal(lerEntrada(new URLSearchParams({ ...base, s: valor })).ok, false, valor);
+    }
+  });
+
+  test("recusa valores acima de R$ 10 milhões", () => {
+    const base = { m: "sem_justa_causa", av: "indenizado", s: "1000", a: "2020-01-01", d: "2025-01-01", f: "0" };
+    assert.equal(lerEntrada(new URLSearchParams({ ...base, s: "10000000" })).ok, true);
+    assert.equal(lerEntrada(new URLSearchParams({ ...base, s: "10000000.01" })).ok, false);
+    assert.equal(lerEntrada(new URLSearchParams({ ...base, f: "99999999" })).ok, false);
+    assert.equal(lerEntrada(new URLSearchParams({ ...base, ad: "99999999" })).ok, false);
+  });
+
+  test("recusa datas fora do intervalo de 1950 a 2100", () => {
+    const base = { m: "sem_justa_causa", av: "indenizado", s: "1000", a: "2020-01-01", d: "2025-01-01", f: "0" };
+    assert.equal(lerEntrada(new URLSearchParams({ ...base, a: "1949-12-31" })).ok, false);
+    assert.equal(lerEntrada(new URLSearchParams({ ...base, d: "2101-01-01" })).ok, false);
+    assert.equal(lerEntrada(new URLSearchParams({ ...base, a: "1950-01-01", d: "2100-12-31" })).ok, true);
+  });
+
+  test("FGTS é opcional quando a modalidade não tem multa", () => {
+    const e = entrada({ m: "pedido_demissao", av: "trabalhado", s: "1000", a: "2024-06-01", d: "2025-03-01" });
+    assert.equal(e.saldoFGTS, 0);
+    assert.equal(e.projetarAviso, false);
+  });
+});
+
+describe("contrato de experiência ou a prazo", () => {
+  const base = { av: "nenhum", s: "3000", a: "2026-08-01", d: "2026-09-14", f: "1000" };
+
+  test("fim no prazo: sem aviso, sem multa, com saque e sem seguro-desemprego", () => {
+    const r = calcularRescisao(entrada({ ...base, m: "termino_prazo" }));
+    assert.equal(valorDe(r, "Saldo de salário"), 1400);
+    assert.ok(!r.verbas.some((v) => v.titulo.startsWith("Aviso")));
+    assert.ok(!r.fgts.some((v) => v.titulo.startsWith("Multa")));
+    assert.ok(r.observacoes.some((o) => o.includes("art. 20, IX")));
+    assert.ok(r.observacoes.some((o) => o.includes("não dá direito ao seguro-desemprego")));
+  });
+
+  test("empresa encerra antes: metade dos dias restantes, fora do FGTS e dos impostos, com multa de 40%", () => {
+    const r = calcularRescisao(entrada({ ...base, m: "antecipada_empresa", fp: "2026-10-29" }));
+    assert.equal(valorDe(r, "Indenização por fim antecipado do contrato"), 2250);
+    assert.equal(valorDe(r, "FGTS sobre verbas rescisórias (8%)"), 132);
+    assert.equal(valorDe(r, "Multa de 40% do FGTS"), 452.8);
+    assert.ok(r.observacoes.some((o) => o.startsWith("A indenização do art. 479")));
+
+    const noPrazo = calcularRescisao(entrada({ ...base, m: "termino_prazo" }));
+    assert.equal(r.impostos, noPrazo.impostos);
+    assert.equal(Math.round((r.total - noPrazo.total) * 100) / 100, 2250);
+  });
+
+  test("empregado sai antes: teto da indenização só como observação, sem multa e sem saque", () => {
+    const r = calcularRescisao(entrada({ ...base, m: "antecipada_empregado", fp: "2026-10-29" }));
+    const noPrazo = calcularRescisao(entrada({ ...base, m: "termino_prazo" }));
+    assert.equal(r.total, noPrazo.total);
+    assert.ok(r.observacoes.some((o) => /R\$\s2\.250,00/.test(o) && o.includes("art. 480")));
+    assert.ok(!r.fgts.some((v) => v.titulo.startsWith("Multa")));
+    assert.ok(r.observacoes.some((o) => o.includes("não libera o saque")));
+  });
+
+  test("valida a data prevista e o limite de 2 anos", () => {
+    const erros = (/** @type {Record<string, string>} */ campos) => {
+      const leitura = lerEntrada(new URLSearchParams(campos));
+      return leitura.ok ? [] : leitura.erros;
+    };
+    assert.match(erros({ ...base, m: "antecipada_empresa" }).join(), /data em que o contrato terminaria/);
+    assert.match(erros({ ...base, m: "antecipada_empresa", fp: "2026-09-14" }).join(), /depois do último dia/);
+    assert.match(erros({ ...base, m: "antecipada_empresa", fp: "2028-08-01" }).join(), /2 anos/);
+    assert.match(erros({ ...base, m: "termino_prazo", a: "2024-01-01", d: "2026-01-01" }).join(), /2 anos/);
+    assert.deepEqual(erros({ ...base, m: "termino_prazo", fp: "lixo" }), []);
+  });
+});

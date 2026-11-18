@@ -1,3 +1,5 @@
+import './calculator/ui.js';
+
 // Header shadow on scroll
 const header = document.getElementById('header');
 const onScroll = () => header.classList.toggle('is-scrolled', window.scrollY > 8);
