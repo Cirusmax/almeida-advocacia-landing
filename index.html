@@ -61,7 +61,7 @@
     }
   }
   </script>
-  <script type="module" crossorigin src="./assets/main-CF2o_fJu.js"></script>
+  <script type="module" crossorigin src="./assets/main-DgVC_wOA.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/main-SlX7T-Ll.css">
 </head>
 <body>
@@ -187,11 +187,13 @@
                   <div class="calculator-field calculator-field--full"><label for="calcModalidade">Como terminou o trabalho?</label><select id="calcModalidade" name="m"><option value="sem_justa_causa">Demissão sem justa causa</option><option value="pedido_demissao">Pedido de demissão</option><option value="acordo">Acordo entre as partes</option><option value="justa_causa">Dispensa por justa causa</option></select></div>
                   <div class="calculator-field"><label for="calcAviso">Aviso prévio</label><select id="calcAviso" name="av"><option value="indenizado">Indenizado</option><option value="trabalhado">Trabalhado</option></select></div>
                   <div class="calculator-field calculator-field--full"><label for="calcFerias">Você tirou e recebeu férias nesse trabalho?</label><select id="calcFerias" name="ferias" required><option value="">Selecione sua situação</option><option value="nunca">Nunca tirei nem recebi férias</option><option value="quitadas">Tirei e recebi tudo que estava pendente</option><option value="parte">Ainda ficou alguma parte pendente</option><option value="incerto">Não sei informar</option></select><small id="calcVacationHelp">Se nunca tirou nem recebeu, calculamos pelas datas. Se faltarem informações, o resultado será identificado como parcial.</small></div>
+                  <div class="calculator-field" id="calcVacationCountField" hidden><label for="calcVacationCount">Quantas férias completas faltam pagar?</label><input id="calcVacationCount" name="ferias_completas" type="number" min="0" max="100" step="1" inputmode="numeric" placeholder="Ex.: 1 ou 2"><small>1 = 30 dias; 2 = 60 dias. Use 0 se faltarem só alguns dias.</small></div>
+                  <div class="calculator-field" id="calcVacationDaysField" hidden><label for="calcVacationDays">Mais alguns dias? (opcional)</label><input id="calcVacationDays" name="ferias_dias" type="number" min="0" max="29" step="1" inputmode="numeric" value="0"><small>Não inclua o que já recebeu nem a parte proporcional: ela é calculada à parte.</small></div>
                   <div class="calculator-field calculator-field--full"><label for="calcPagamento">Já recebeu o acerto?</label><select id="calcPagamento" name="pagamento"><option value="sim">Sim, quero comparar</option><option value="nao">Ainda não recebi</option><option value="incerto">Não sei informar o valor</option></select></div>
                   <div class="calculator-field calculator-field--full" id="calcRecebidoField"><label for="calcRecebido">Valor líquido recebido no acerto (R$)</label><input id="calcRecebido" name="recebido" type="number" min="0" max="10000000" step="0.01" inputmode="decimal" placeholder="Ex.: 1800,00"><small>Não inclua saque de FGTS nem salários de meses anteriores.</small></div>
                 </div>
                 <details class="calculator-more"><summary>Ajustar FGTS, 13º e dependentes</summary><div class="calculator-fields">
-                  <div class="calculator-field calculator-field--full" id="calcFGTSField"><label for="calcFGTS">Base do FGTS deste vínculo para a multa (R$)</label><input id="calcFGTS" name="f" type="number" min="0" max="10000000" step="0.01" inputmode="decimal" placeholder="Se não souber, deixe em branco"><small>Use o valor para fins rescisórios do extrato, antes dos depósitos da rescisão. Sem ele, a estimativa de FGTS fica incompleta.</small></div>
+                  <div class="calculator-field calculator-field--full" id="calcFGTSField"><label for="calcFGTS">Base do FGTS deste vínculo para a multa (R$)</label><input id="calcFGTS" name="f" type="number" min="0" max="10000000" step="0.01" inputmode="decimal" placeholder="Em branco: estimamos pelo tempo de trabalho"><small>Se souber, use a base para fins rescisórios do extrato. Se deixar em branco, estimamos com o último salário e as datas do contrato.</small></div>
                   <div class="calculator-field"><label for="calc13">Adiantamento de 13º recebido (R$)</label><input id="calc13" name="ad" type="number" min="0" max="10000000" step="0.01" inputmode="decimal" value="0"></div>
                   <div class="calculator-field"><label for="calcDependentes">Dependentes para IRRF</label><input id="calcDependentes" name="dp" type="number" min="0" max="20" step="1" value="0" inputmode="numeric"></div>
                 </div></details>
