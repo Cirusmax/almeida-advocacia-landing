@@ -17,8 +17,10 @@ nos pontos documentados na revisão; a licença original foi preservada.
 O modo sem registro estima FGTS anterior usando salário constante e ausência de
 depósitos. Não determina vínculo e não soma novamente salários já recebidos. Não
 calcula salários ou 13º de anos anteriores ainda não pagos, juros e correção,
-prescrição, adicionais, médias ou convenções coletivas. Férias antigas sem dados
-ficam sinalizadas como pendentes e não geram uma diferença final automática.
+prescrição, adicionais, médias ou convenções coletivas. Férias parcialmente pendentes
+informadas entram com 1/3; a eventual dobra exige as datas de concessão. Se a pessoa
+não souber informar suas férias, o resultado fica parcial. FGTS não informado é
+estimado também no modo com registro, sem confirmar depósitos ou saldo existente.
 
 ## Verificação das tabelas (18/11/2026)
 

@@ -1,7 +1,7 @@
 import { somarAnos, somarDias, avosDeServico, diasDeAviso, dataEfetiva, MODALIDADES } from './vendor/rescisao.js';
 import { arredondar } from './vendor/tributos.js';
 
-export function calcularFerias(entrada, resposta) {
+export function calcularFerias(entrada, resposta, pendencias = { completas: 0, dias: 0 }) {
   const efetiva = dataEfetiva(entrada, diasDeAviso(entrada));
   const periodos = [];
   let indice = 0;
@@ -21,6 +21,14 @@ export function calcularFerias(entrada, resposta) {
   }
   if (simples) verbas.push({ titulo: 'Férias completas + 1/3', detalhe: `${simples} período(s) completo(s) ainda dentro do prazo de concessão`, valor: arredondar(entrada.salario * 4 / 3 * simples) });
   if (dobro) verbas.push({ titulo: 'Férias não concedidas no prazo, em dobro + 1/3', detalhe: `${dobro} período(s) com prazo de concessão encerrado`, valor: arredondar(entrada.salario * 8 / 3 * dobro) });
+  if (resposta === 'parte') {
+    const diasPendentes = pendencias.completas * 30 + pendencias.dias;
+    if (diasPendentes > 0) verbas.push({
+      titulo: 'Férias pendentes informadas + 1/3',
+      detalhe: `${pendencias.completas} férias completas e ${pendencias.dias} dia(s) ainda não pagos; sem presumir dobra`,
+      valor: arredondar(entrada.salario / 30 * diasPendentes * 4 / 3),
+    });
+  }
   const inicioAtual = somarAnos(entrada.admissao, indice);
   const avos = Math.min(12, avosDeServico(inicioAtual, efetiva));
   if (MODALIDADES[entrada.modalidade].proporcionais && avos > 0) {
@@ -28,13 +36,14 @@ export function calcularFerias(entrada, resposta) {
   }
   return {
     verbas,
-    parcial: ['parte', 'incerto'].includes(resposta),
+    parcial: resposta === 'incerto',
+    pendenciasInformadas: resposta === 'parte' ? pendencias : null,
     completos: periodos.length,
     simples, dobro, avos,
     descricao: {
       nunca: 'Nunca tirei férias nem recebi o pagamento correspondente.',
       quitadas: 'Tirei e recebi todas as férias completas já adquiridas antes da saída.',
-      parte: 'Tirei férias, mas ainda ficou parte pendente. A estimativa não inclui os períodos antigos sem informação.',
+      parte: `${pendencias.completas} férias completas e ${pendencias.dias} dia(s) de férias ainda não pagos. Incluídos com 1/3, sem presumir dobra por atraso na concessão.`,
       incerto: 'Não sei informar as férias. A estimativa não inclui os períodos antigos sem informação.',
     }[resposta],
   };

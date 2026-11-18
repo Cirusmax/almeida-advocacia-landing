@@ -40,6 +40,10 @@ export function simular(campos, modo = 'acerto', hoje = new Date()) {
   if (!leitura.ok) return leitura;
   const entrada = leitura.entrada;
   const erros = [];
+  const fgtsInformado = (dados.get('f') || '').trim();
+  if (modo === 'acerto' && !desconheceFGTS && (!/^\d+([.,]\d{1,2})?$/.test(fgtsInformado) || Number(fgtsInformado.replace(',', '.')) > 10000000)) {
+    erros.push('Informe um valor de FGTS válido, entre zero e R$ 10.000.000,00, ou deixe em branco para estimar.');
+  }
   if (entrada.desligamento.getFullYear() < 2018) erros.push('Para uma saída anterior a 2018, é necessária análise das regras históricas do contrato. Fale com o escritório.');
   const respostaFerias = dados.get('ferias');
   if (!['nunca', 'quitadas', 'parte', 'incerto'].includes(respostaFerias)) erros.push('Informe se tirou e recebeu férias durante esse trabalho.');
@@ -52,10 +56,31 @@ export function simular(campos, modo = 'acerto', hoje = new Date()) {
   if (pagamento === 'sim' && (!/^\d+([.,]\d{1,2})?$/.test(textoRecebido) || !Number.isFinite(recebido) || recebido < 0 || recebido > 10000000)) {
     erros.push('Informe o valor líquido recebido, entre zero e R$ 10.000.000,00.');
   }
+  const pendencias = { completas: 0, dias: 0 };
+  if (respostaFerias === 'parte') {
+    const completas = (dados.get('ferias_completas') || '').trim();
+    const dias = (dados.get('ferias_dias') || '0').trim();
+    pendencias.completas = Number(completas);
+    pendencias.dias = Number(dias);
+    const feriasReferencia = calcularFerias(entrada, 'quitadas');
+    const maxCompletas = feriasReferencia.completos - feriasReferencia.simples;
+    if (!/^\d+$/.test(completas) || !Number.isSafeInteger(pendencias.completas) || pendencias.completas < 0 || pendencias.completas > maxCompletas) {
+      erros.push(`Informe quantas férias completas ainda não foram pagas (de 0 a ${maxCompletas}, conforme o tempo trabalhado).`);
+    }
+    if (!/^\d+$/.test(dias) || !Number.isInteger(pendencias.dias) || pendencias.dias < 0 || pendencias.dias > 29) {
+      erros.push('Informe de 0 a 29 dias adicionais de férias pendentes.');
+    }
+    if (pendencias.completas * 30 + pendencias.dias > maxCompletas * 30) {
+      erros.push('As férias pendentes informadas ultrapassam o total de férias completas adquirido antes da saída. Confira a quantidade.');
+    } else if (completas !== '' && pendencias.completas * 30 + pendencias.dias === 0) {
+      erros.push('Informe as férias completas pendentes ou os dias que faltam. Se não souber a quantidade, selecione “Não sei informar”.');
+    }
+  }
   if (erros.length) return { ok: false, erros };
-  const fgtsAnterior = modo === 'registro' ? estimarFGTSAnterior(entrada) : entrada.saldoFGTS;
+  const fgtsEstimado = modo === 'registro' || desconheceFGTS;
+  const fgtsAnterior = fgtsEstimado ? estimarFGTSAnterior(entrada) : Number(fgtsInformado.replace(',', '.'));
   entrada.saldoFGTS = fgtsAnterior;
-  const ferias = calcularFerias(entrada, respostaFerias);
+  const ferias = calcularFerias(entrada, respostaFerias, pendencias);
   const tributos = tributosPara(entrada, dataEfetiva(entrada, diasDeAviso(entrada)));
   const resultado = calcularRescisao(entrada, { ferias: ferias.verbas, tributos });
   if (!tributos.completo) {
@@ -69,13 +94,13 @@ export function simular(campos, modo = 'acerto', hoje = new Date()) {
     diferenca: pagamento === 'incerto' || !comparavel ? null : arredondar(resultado.total - recebido),
     fgtsAnterior,
     fgtsPeriodo: arredondar(fgtsAnterior + resultado.totalFGTS),
-    fgtsIncompleto: desconheceFGTS && MODALIDADES[entrada.modalidade].multaFGTS > 0,
+    fgtsEstimado,
     ferias, tributosCompletos: tributos.completo, comparavel,
   };
 }
 
 export function mensagemWhatsApp(simulacao) {
-  const { entrada, resultado, modo, recebido, diferenca, pagamento, fgtsPeriodo, fgtsIncompleto, ferias, tributosCompletos } = simulacao;
+  const { entrada, resultado, modo, recebido, diferenca, pagamento, fgtsPeriodo, fgtsEstimado, ferias, tributosCompletos } = simulacao;
   const moeda = n => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const data = d => d.toLocaleDateString('pt-BR');
   return [
@@ -88,7 +113,7 @@ export function mensagemWhatsApp(simulacao) {
     `${ferias.parcial ? 'Estimativa parcial' : 'Acerto estimado'} ${tributosCompletos ? 'após descontos estimados' : 'antes de impostos'}: ${moeda(resultado.total)}.`,
     pagamento === 'incerto' ? 'Não sei informar o valor líquido recebido.' : pagamento === 'nao' ? 'Ainda não recebi o acerto.' : `Acerto líquido recebido: ${moeda(recebido)}.`,
     diferenca === null ? '' : `Diferença estimada (pode ser negativa): ${moeda(diferenca)}.`,
-    `FGTS ${modo === 'registro' ? 'estimado do período, com depósitos rescisórios e eventual multa' : fgtsIncompleto ? 'parcial: base anterior desconhecida, multa e total incompletos' : 'informado, com depósitos rescisórios e eventual multa'}: ${moeda(fgtsPeriodo)} (separado do acerto).`,
+    `FGTS ${fgtsEstimado ? 'estimado pelo tempo de trabalho e último salário; sem confirmação do saldo existente' : 'informado, com depósitos rescisórios e eventual multa'}: ${moeda(fgtsPeriodo)} (separado do acerto).`,
     'Os valores são uma simulação, sujeitos à conferência dos documentos e das premissas.',
     'Estimativa nominal na saída, sem atualização judicial. Pagamento em outro mês/ano exige revisão dos descontos.',
   ].filter(Boolean).join('\n');

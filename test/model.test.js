@@ -12,10 +12,11 @@ test('compara somente o líquido do acerto, sem somar FGTS à diferença', () =>
   assert.equal(r.diferenca, 2547.65);
   assert.ok(r.fgtsPeriodo > 5000);
 });
-test('FGTS desconhecido fica explicitamente incompleto, não cria depósitos anteriores', () => {
+test('FGTS não informado é estimado pelo salário e tempo de trabalho', () => {
   const r = simular(dados({ f: '' }), 'acerto', hoje);
-  assert.equal(r.fgtsIncompleto, true);
-  assert.equal(r.fgtsAnterior, 0);
+  assert.equal(r.fgtsEstimado, true);
+  assert.ok(r.fgtsAnterior > 0);
+  assert.ok(r.fgtsPeriodo > r.fgtsAnterior);
 });
 test('sem registro estima depósitos anteriores e 13º sem contar a rescisão duas vezes', () => {
   const r = simular(dados({ a: '2026-01-01', d: '2026-07-15', fv: '0', f: '999999' }), 'registro', hoje);

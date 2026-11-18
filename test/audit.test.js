@@ -46,8 +46,8 @@ test('férias quitadas não são cobradas novamente; proporcionais continuam pre
   assert.equal(r.resultado.verbas.filter(v => v.titulo.startsWith('Férias')).length, 1);
   assert.equal(r.ferias.verbas[0].valor, 3666.67);
 });
-test('férias desconhecidas e parcialmente pendentes não geram diferença final enganosa', () => {
-  for (const resposta of ['parte', 'incerto']) {
+test('férias desconhecidas não geram diferença final enganosa', () => {
+  for (const resposta of ['incerto']) {
     const r = simular(entrada({ ferias: resposta }), 'acerto', hoje);
     assert.equal(r.ferias.parcial, true);
     assert.equal(r.comparavel, false);

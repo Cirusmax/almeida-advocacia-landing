@@ -28,8 +28,13 @@ um cálculo judicial nem à análise de todos os fatos de cada contrato.
    tirou nem recebeu, contam-se todos os períodos desde a admissão, os prazos concessivos
    e a projeção do aviso. A dobra só entra após expirar o prazo concessivo. O limite
    artificial de dois períodos foi removido. A estimativa presume 30 dias por ano.
-5. Quando não se sabe quais férias foram pagas, ou resta parte pendente, os períodos
-   antigos não são tratados como quitados: o resultado é parcial e não gera uma
+5. Quando resta parte pendente, o visitante informa quantas férias completas faltam
+   pagar e, opcionalmente, até 29 dias adicionais. Essas férias entram no acerto com
+   1/3, além das proporcionais calculadas pelas datas. Uma quantidade esquecida não
+   vira zero: é solicitada antes do cálculo. A quantidade é validada contra o tempo
+   adquirido antes da saída para não duplicar períodos completados pela projeção.
+   Não se presume dobra sem saber as datas de gozo e pagamento. Se o visitante
+   selecionar que não sabe informar, o resultado continua parcial e não gera uma
    diferença final automática.
 6. O 13º projetado em outro ano é separado por ano para apuração da contribuição,
    em vez de misturar as bases numa só. Sem tabela para alguma competência, não se
@@ -62,8 +67,15 @@ reversão de justa causa. Considera empregado CLT comum e contrato por prazo ind
 Não calcula médias variáveis, adicionais, horas extras, convenções, afastamentos,
 faltas que alterem férias, salários nem 13º antigos atrasados. O FGTS sem registro
 presume salário constante e nenhum depósito anterior; não inclui correção.
-Férias parcialmente gozadas, férias antecipadas/coletivas, pagamento sem gozo e
-outras combinações precisam de documentos. Não são convertidas em certeza pelo formulário.
+Quando o FGTS não é informado, também no modo com registro, a base anterior é
+estimada pelo tempo trabalhado e último salário, incluindo 13º, sem duplicar o mês
+da rescisão. O valor informado pelo visitante prevalece, inclusive zero. Estimativa
+não confirma depósitos realizados, saldo disponível ou saques. Não considera terço
+de férias gozadas, correção ou histórico salarial. O FGTS é mostrado separado do acerto.
+Férias antecipadas/coletivas, pagamentos parciais em dinheiro, pagamento sem gozo
+e outras combinações precisam de documentos. A quantidade de férias ainda não pagas
+informada pelo visitante entra como estimativa simples com 1/3; a eventual dobra
+depende das datas de concessão. Não são convertidas em certeza pelo formulário.
 
 ## Fontes verificadas
 
