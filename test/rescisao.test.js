@@ -145,9 +145,10 @@ describe("calcularRescisao", () => {
     assert.equal(valorDe(r, "13º salário proporcional"), 2250);
     assert.equal(valorDe(r, "Férias proporcionais + 1/3"), 1666.67);
     assert.equal(valorDe(r, "FGTS sobre verbas rescisórias (8%)"), 652);
-    assert.equal(valorDe(r, "Multa de 40% do FGTS"), 4260.8);
+    // TST Tema 255: 40% × (10,000 + 8% × (2,000 salary + 2,000 unprojected 13th)).
+    assert.equal(valorDe(r, "Multa de 40% do FGTS"), 4128);
     assert.equal(semImpostos(r), 9816.67);
-    assert.equal(r.totalFGTS, 4912.8);
+    assert.equal(r.totalFGTS, 4780);
   });
 
   test("multa e depósito do FGTS ficam fora do valor a receber", () => {
@@ -178,14 +179,14 @@ describe("calcularRescisao", () => {
     const r = calcularRescisao(entrada({ ...contrato, m: "acordo", av: "indenizado" }));
     assert.equal(valorDe(r, "Aviso prévio indenizado"), 1950);
     assert.equal(valorDe(r, "FGTS sobre verbas rescisórias (8%)"), 496);
-    assert.equal(valorDe(r, "Multa de 20% do FGTS"), 2099.2);
+    assert.equal(valorDe(r, "Multa de 20% do FGTS"), 2064);
     assert.equal(semImpostos(r), 7866.67);
   });
 
   test("aviso trabalhado não entra no total", () => {
     const r = calcularRescisao(entrada({ ...contrato, m: "sem_justa_causa", av: "trabalhado" }));
     assert.equal(valorDe(r, "Aviso prévio indenizado"), undefined);
-    assert.ok(r.observacoes.some((o) => o.startsWith("Aviso trabalhado de 39 dias")));
+    assert.ok(r.observacoes.some((o) => o.startsWith("Aviso trabalhado: a data de saída")));
   });
 
   test("pedido de demissão com aviso não cumprido desconta um salário", () => {
@@ -228,7 +229,7 @@ describe("calcularRescisao", () => {
     assert.deepEqual(descontosSemImpostos(r).map((d) => d.valor), [1000]);
     assert.equal(semImpostos(r), 8816.67);
     assert.equal(valorDe(r, "FGTS sobre verbas rescisórias (8%)"), 572);
-    assert.equal(valorDe(r, "Multa de 40% do FGTS"), 4228.8);
+    assert.equal(valorDe(r, "Multa de 40% do FGTS"), 4096);
   });
 
   test("adiantamento maior que o 13º compensa o excedente nas demais verbas", () => {

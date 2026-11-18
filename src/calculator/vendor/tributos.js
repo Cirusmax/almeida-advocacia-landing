@@ -36,7 +36,9 @@ export function calcularINSS(base) {
   let inicio = 0;
   for (const { ate, aliquota } of FAIXAS_INSS) {
     if (base <= inicio) break;
-    total += (Math.min(base, ate) - inicio) * aliquota;
+    // eSocial MOS S-5001, item 2.13: truncate each bracket to cents.
+    const parcela = (Math.min(base, ate) - inicio) * aliquota;
+    total += Math.floor(Number((parcela * 100).toFixed(6))) / 100;
     inicio = ate;
   }
   return arredondar(total);

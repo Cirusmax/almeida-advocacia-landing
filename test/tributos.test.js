@@ -5,14 +5,14 @@ import { arredondar, calcularINSS, calcularIRRF } from "../src/calculator/vendor
 
 describe("INSS 2026", () => {
   test("aplica cada alíquota só sobre a parte dentro da faixa", () => {
-    assert.equal(calcularINSS(1621), 121.58);
-    assert.equal(calcularINSS(3000), 248.6);
-    assert.equal(calcularINSS(4500), 431.51);
+    assert.equal(calcularINSS(1621), 121.57);
+    assert.equal(calcularINSS(3000), 248.58);
+    assert.equal(calcularINSS(4500), 431.50);
   });
 
   test("para no teto de R$ 8.475,55", () => {
-    assert.equal(calcularINSS(8475.55), 988.09);
-    assert.equal(calcularINSS(20000), 988.09);
+    assert.equal(calcularINSS(8475.55), 988.07);
+    assert.equal(calcularINSS(20000), 988.07);
   });
 
   test("zero não tem contribuição", () => {
@@ -64,29 +64,29 @@ describe("rescisão com INSS e IRRF", () => {
     const r = rescisao({ s: "3000" });
     assert.equal(r.bruto, 10883.33);
     assert.equal(desconto(r, "INSS sobre o saldo de salário"), 112.5);
-    assert.equal(desconto(r, "INSS sobre o 13º"), 223.19);
+    assert.equal(desconto(r, "INSS sobre o 13º"), 223.18);
     assert.equal(desconto(r, "IRRF sobre o saldo de salário"), 0);
     assert.equal(desconto(r, "IRRF sobre o 13º"), 0);
-    assert.equal(r.total, 10547.64);
+    assert.equal(r.total, 10547.65);
   });
 
   test("salário de R$ 6.000: IRRF do 13º com redução parcial", () => {
     const r = rescisao({ s: "6000" });
     assert.equal(r.bruto, 21766.67);
-    assert.equal(desconto(r, "INSS sobre o saldo de salário"), 248.6);
-    assert.equal(desconto(r, "INSS sobre o 13º"), 571.51);
+    assert.equal(desconto(r, "INSS sobre o saldo de salário"), 248.58);
+    assert.equal(desconto(r, "INSS sobre o 13º"), 571.50);
     assert.equal(desconto(r, "IRRF sobre o 13º"), 190.47);
-    assert.equal(r.total, 20756.09);
+    assert.equal(r.total, 20756.12);
   });
 
   test("salário de R$ 9.000: IRRF do 13º sem redução", () => {
     const r = rescisao({ s: "9000" });
     assert.equal(r.bruto, 32650);
-    assert.equal(desconto(r, "INSS sobre o saldo de salário"), 431.51);
+    assert.equal(desconto(r, "INSS sobre o saldo de salário"), 431.50);
     assert.equal(desconto(r, "IRRF sobre o saldo de salário"), 0);
-    assert.equal(desconto(r, "INSS sobre o 13º"), 956.51);
+    assert.equal(desconto(r, "INSS sobre o 13º"), 956.50);
     assert.equal(desconto(r, "IRRF sobre o 13º"), 1096.98);
-    assert.equal(r.total, 30165);
+    assert.equal(r.total, 30165.02);
   });
 
   test("aviso indenizado e férias não têm desconto", () => {

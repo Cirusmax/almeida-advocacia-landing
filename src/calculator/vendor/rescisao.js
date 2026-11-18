@@ -430,7 +430,12 @@ function incluir(lista, titulo, detalhe, valor) {
 }
 
 /** @param {Entrada} entrada @returns {Resultado} */
-export function calcularRescisao(entrada) {
+export function calcularRescisao(entrada, opcoes = {}) {
+  // Almeida integration: optional historical tax context and date-derived vacation items.
+  // The upstream algorithm is retained with audit corrections documented in CALCULATION_AUDIT.md.
+  const anoTabelas = opcoes.tributos?.ano ?? ANO_TABELAS;
+  const inssCalculo = opcoes.tributos?.calcularINSS ?? calcularINSS;
+  const irrfCalculo = opcoes.tributos?.calcularIRRF ?? calcularIRRF;
   const { salario, admissao, desligamento, modalidade, tipoAviso, saldoFGTS } = entrada;
   const regras = MODALIDADES[modalidade];
   const diasAviso = diasDeAviso(entrada);
@@ -479,15 +484,18 @@ export function calcularRescisao(entrada) {
     incluir(verbas, "13º salário proporcional", `${detalhe} (Lei 4.090/62)`, decimoPago);
   }
 
-  if (entrada.feriasVencidas > 0) {
+  if (opcoes.ferias) {
+    for (const verba of opcoes.ferias) incluir(verbas, verba.titulo, verba.detalhe, verba.valor);
+  }
+  if (!opcoes.ferias && entrada.feriasVencidas > 0) {
     incluir(verbas, "Férias vencidas + 1/3", "1 período aquisitivo (CLT, art. 146)", salario * (4 / 3));
   }
-  if (entrada.feriasVencidas > 1) {
+  if (!opcoes.ferias && entrada.feriasVencidas > 1) {
     // Com dois períodos completos sem gozo, o prazo concessivo do mais antigo já acabou.
     incluir(verbas, "Férias vencidas em dobro + 1/3", "período fora do prazo concessivo (CLT, art. 137)", salario * (8 / 3));
   }
 
-  if (regras.proporcionais) {
+  if (!opcoes.ferias && regras.proporcionais) {
     const ferias = feriasProporcionais(salario, admissao, desligamento, efetiva);
     incluir(verbas, "Férias integrais + 1/3", "período aquisitivo completado pela projeção do aviso", ferias.valorIntegral);
     incluir(verbas, "Férias proporcionais + 1/3", `${ferias.avos}/12 (CLT, art. 146; Súmula 261 TST)`, ferias.valor);
@@ -503,8 +511,13 @@ export function calcularRescisao(entrada) {
   incluir(fgts, "FGTS sobre verbas rescisórias (8%)", "saldo de salário, aviso indenizado e 13º (Súmula 305 TST)", depositoRescisorio);
   if (regras.multaFGTS > 0) {
     const percentual = Math.round(regras.multaFGTS * 100);
-    const base = centavos(saldoFGTS + depositoRescisorio);
-    incluir(fgts, `Multa de ${percentual}% do FGTS`, `sobre ${formatarMoeda(base)}: saldo informado + depósito rescisório`, base * regras.multaFGTS);
+    // TST Tema 255 / OJ 42 II: the deposit on indemnified notice remains due,
+    // but notice and its projected 13th do not increase the severance-fine base.
+    const decimoSemProjecao = regras.proporcionais
+      ? centavos(decimoTerceiroProporcional(salario, admissao, desligamento, desligamento).valor) : 0;
+    const baseSemAviso = centavos(saldo.valor) + Math.max(0, decimoSemProjecao - Math.min(entrada.adiantamento13, decimoSemProjecao));
+    const base = centavos(saldoFGTS + centavos(baseSemAviso * ALIQUOTA_FGTS));
+    incluir(fgts, `Multa de ${percentual}% do FGTS`, `sobre ${formatarMoeda(base)}, sem projeção do aviso indenizado (TST, Tema 255 / OJ 42 II)`, base * regras.multaFGTS);
   }
   const totalFGTS = centavos(fgts.reduce((soma, v) => soma + v.valor, 0));
 
@@ -522,11 +535,26 @@ export function calcularRescisao(entrada) {
   // Saldo de salário e 13º têm INSS e IRRF, cada um calculado em separado. Aviso indenizado, férias
   // indenizadas com 1/3 e multa do FGTS são isentos (STJ Tema 478; Lei 8.212, art. 28, §9º; IN RFB 1.500/2014).
   const saldoTributavel = centavos(saldo.valor);
-  const inssSaldo = calcularINSS(saldoTributavel);
-  const irrfSaldo = calcularIRRF({ rendimento: saldoTributavel, inss: inssSaldo, dependentes: entrada.dependentes });
-  const inss13 = calcularINSS(decimoPago);
-  const irrf13 = calcularIRRF({ rendimento: decimoPago, inss: inss13, dependentes: entrada.dependentes });
-  incluir(descontos, "INSS sobre o saldo de salário", `tabela progressiva de ${ANO_TABELAS}`, inssSaldo);
+  const inssSaldo = inssCalculo(saldoTributavel);
+  const irrfSaldo = irrfCalculo({ rendimento: saldoTributavel, inss: inssSaldo, dependentes: entrada.dependentes });
+  const partes13 = opcoes.tributos && regras.proporcionais
+    ? decimoTerceiroProporcional(salario, admissao, desligamento, efetiva).porAno
+    : [{ ano: desligamento.getFullYear(), avos: 0, valor: decimoPago }];
+  let inss13 = 0;
+  const irrf13 = { base: 0, valor: 0, reducao: 0 };
+  for (const parte of partes13) {
+    const valor = parte.valor ?? centavos(salario / 12 * parte.avos);
+    const competencia = new Date(parte.ano, parte.ano === efetiva.getFullYear() ? efetiva.getMonth() : 11, 1);
+    const contribuicao = inssCalculo(valor, competencia);
+    // Nominal settlement assumes payment in the termination month. The projected
+    // service month is not, by itself, the IRRF cash-receipt date.
+    const imposto = irrfCalculo({ rendimento: valor, inss: contribuicao, dependentes: entrada.dependentes }, desligamento);
+    inss13 += contribuicao;
+    irrf13.base += imposto.base; irrf13.valor += imposto.valor; irrf13.reducao += imposto.reducao;
+  }
+  inss13 = centavos(inss13);
+  irrf13.valor = centavos(irrf13.valor);
+  incluir(descontos, "INSS sobre o saldo de salário", `tabela progressiva de ${anoTabelas}`, inssSaldo);
   incluir(descontos, "IRRF sobre o saldo de salário", `base ${formatarMoeda(irrfSaldo.base)}`, irrfSaldo.valor);
   incluir(descontos, "INSS sobre o 13º", "calculado em separado do salário", inss13);
   incluir(descontos, "IRRF sobre o 13º", `tributação exclusiva, base ${formatarMoeda(irrf13.base)}`, irrf13.valor);
@@ -539,8 +567,8 @@ export function calcularRescisao(entrada) {
     observacoes.push(`Os descontos foram limitados ao valor das verbas (${formatarMoeda(bruto)}).`);
   }
 
-  if (desligamento.getFullYear() !== ANO_TABELAS) {
-    observacoes.push(`INSS e IRRF calculados com as tabelas de ${ANO_TABELAS}.`);
+  if (desligamento.getFullYear() !== anoTabelas) {
+    observacoes.push(`INSS e IRRF calculados com as tabelas de ${anoTabelas}.`);
   }
   if (irrfSaldo.reducao > 0 || irrf13.reducao > 0) {
     observacoes.push("O IRRF já considera a redução da Lei 15.270/2025: rendimentos de até R$ 5.000 ficam isentos.");
@@ -561,10 +589,9 @@ export function calcularRescisao(entrada) {
     observacoes.push(`Data efetiva com a projeção do aviso: ${formatarData(efetiva)} (${diasAviso} dias após ${formatarData(desligamento)}).`);
   }
   if (tipoAviso === "trabalhado") {
-    const inicio = somarDias(desligamento, -(diasAviso - 1));
     observacoes.push(
-      `Aviso trabalhado de ${diasAviso} dias, de ${formatarData(inicio)} a ${formatarData(desligamento)}. ` +
-      "O salário do período já é pago normalmente e não entra no total.",
+      "Aviso trabalhado: a data de saída deve ser o último dia do contrato, já considerando o aviso. " +
+      "O salário desse período é pago normalmente e não é acrescentado novamente. Eventuais dias proporcionais indenizados exigem conferência separada.",
     );
   }
   if (tipoAviso === "dispensado") {

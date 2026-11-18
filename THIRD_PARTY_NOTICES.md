@@ -9,13 +9,16 @@ distribuído com o site em `/licencas/calculadora.txt`.
 
 Interface e integração adaptadas à identidade visual existente da Almeida Advocacia.
 Os valores são estimativas; as modalidades visíveis são contratos comuns sem prazo
-determinado. As tabelas tributárias disponíveis nesta versão são as de 2026.
+determinado. A integração foi revisada conforme `CALCULATION_AUDIT.md`: tabelas
+tributárias de 2024 a 2026, férias automáticas por datas, truncamento do INSS e
+correção da base da multa do FGTS. Os arquivos do motor e testes foram adaptados
+nos pontos documentados na revisão; a licença original foi preservada.
 
 O modo sem registro estima FGTS anterior usando salário constante e ausência de
 depósitos. Não determina vínculo e não soma novamente salários já recebidos. Não
 calcula salários ou 13º de anos anteriores ainda não pagos, juros e correção,
-prescrição, adicionais, médias ou convenções coletivas. Férias pendentes têm limite
-de dois períodos; outros casos dependem de análise.
+prescrição, adicionais, médias ou convenções coletivas. Férias antigas sem dados
+ficam sinalizadas como pendentes e não geram uma diferença final automática.
 
 ## Verificação das tabelas (18/11/2026)
 

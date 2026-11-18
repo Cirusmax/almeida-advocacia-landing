@@ -1,7 +1,8 @@
-import { calcularRescisao, lerEntrada, mesesCivisComQuinzeDias, saldoDeSalario, MODALIDADES } from './vendor/rescisao.js';
+import { calcularRescisao, lerEntrada, mesesCivisComQuinzeDias, saldoDeSalario, MODALIDADES, diasDeAviso, dataEfetiva } from './vendor/rescisao.js';
 import { arredondar } from './vendor/tributos.js';
+import { calcularFerias } from './vacations.js';
+import { tributosPara } from './historical-taxes.js';
 
-export const YEAR = 2026;
 export const WHATSAPP = '5532999055427';
 
 // Constant salary, ordinary CLT employee (8%). No correction, interest or variable pay.
@@ -33,11 +34,15 @@ export function simular(campos, modo = 'acerto', hoje = new Date()) {
   const desconheceFGTS = modo === 'acerto' && !(dados.get('f') || '').trim();
   if (modo === 'registro' || desconheceFGTS) dados.set('f', '0');
   dados.set('p', 'on');
+  // Pending complete vacations are derived from the plain-language answer below.
+  dados.set('fv', '0');
   const leitura = lerEntrada(dados);
   if (!leitura.ok) return leitura;
   const entrada = leitura.entrada;
   const erros = [];
-  if (entrada.desligamento.getFullYear() !== YEAR) erros.push(`Esta versão usa INSS e IRRF de ${YEAR}. Informe uma saída em ${YEAR}.`);
+  if (entrada.desligamento.getFullYear() < 2018) erros.push('Para uma saída anterior a 2018, é necessária análise das regras históricas do contrato. Fale com o escritório.');
+  const respostaFerias = dados.get('ferias');
+  if (!['nunca', 'quitadas', 'parte', 'incerto'].includes(respostaFerias)) erros.push('Informe se tirou e recebeu férias durante esse trabalho.');
   const limite = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
   if (entrada.desligamento > limite) erros.push('Informe uma data de saída que não esteja no futuro.');
   const pagamento = dados.get('pagamento');
@@ -50,19 +55,27 @@ export function simular(campos, modo = 'acerto', hoje = new Date()) {
   if (erros.length) return { ok: false, erros };
   const fgtsAnterior = modo === 'registro' ? estimarFGTSAnterior(entrada) : entrada.saldoFGTS;
   entrada.saldoFGTS = fgtsAnterior;
-  const resultado = calcularRescisao(entrada);
+  const ferias = calcularFerias(entrada, respostaFerias);
+  const tributos = tributosPara(entrada, dataEfetiva(entrada, diasDeAviso(entrada)));
+  const resultado = calcularRescisao(entrada, { ferias: ferias.verbas, tributos });
+  if (!tributos.completo) {
+    resultado.observacoes = resultado.observacoes.filter(texto => !/IRRF|INSS/.test(texto));
+    resultado.observacoes.push('Não há tabela de impostos cadastrada para todas as competências deste caso. O resultado é antes de impostos e não é comparado ao líquido recebido.');
+  }
+  const comparavel = tributos.completo && !ferias.parcial;
   return {
     ok: true, entrada, resultado, modo, pagamento,
     recebido: pagamento === 'incerto' ? null : recebido,
-    diferenca: pagamento === 'incerto' ? null : arredondar(resultado.total - recebido),
+    diferenca: pagamento === 'incerto' || !comparavel ? null : arredondar(resultado.total - recebido),
     fgtsAnterior,
     fgtsPeriodo: arredondar(fgtsAnterior + resultado.totalFGTS),
     fgtsIncompleto: desconheceFGTS && MODALIDADES[entrada.modalidade].multaFGTS > 0,
+    ferias, tributosCompletos: tributos.completo, comparavel,
   };
 }
 
 export function mensagemWhatsApp(simulacao) {
-  const { entrada, resultado, modo, recebido, diferenca, pagamento, fgtsPeriodo, fgtsIncompleto } = simulacao;
+  const { entrada, resultado, modo, recebido, diferenca, pagamento, fgtsPeriodo, fgtsIncompleto, ferias, tributosCompletos } = simulacao;
   const moeda = n => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const data = d => d.toLocaleDateString('pt-BR');
   return [
@@ -71,11 +84,12 @@ export function mensagemWhatsApp(simulacao) {
     `Período: ${data(entrada.admissao)} a ${data(entrada.desligamento)}.`,
     `Último salário bruto: ${moeda(entrada.salario)}.`,
     `Saída informada: ${MODALIDADES[entrada.modalidade].rotulo}.`,
-    `Aviso: ${entrada.tipoAviso}. Férias completas pendentes: ${entrada.feriasVencidas}.`,
-    `Acerto líquido estimado: ${moeda(resultado.total)}.`,
+    `Aviso: ${entrada.tipoAviso}. Férias: ${ferias.descricao}`,
+    `${ferias.parcial ? 'Estimativa parcial' : 'Acerto estimado'} ${tributosCompletos ? 'após descontos estimados' : 'antes de impostos'}: ${moeda(resultado.total)}.`,
     pagamento === 'incerto' ? 'Não sei informar o valor líquido recebido.' : pagamento === 'nao' ? 'Ainda não recebi o acerto.' : `Acerto líquido recebido: ${moeda(recebido)}.`,
     diferenca === null ? '' : `Diferença estimada (pode ser negativa): ${moeda(diferenca)}.`,
     `FGTS ${modo === 'registro' ? 'estimado do período, com depósitos rescisórios e eventual multa' : fgtsIncompleto ? 'parcial: base anterior desconhecida, multa e total incompletos' : 'informado, com depósitos rescisórios e eventual multa'}: ${moeda(fgtsPeriodo)} (separado do acerto).`,
     'Os valores são uma simulação, sujeitos à conferência dos documentos e das premissas.',
+    'Estimativa nominal na saída, sem atualização judicial. Pagamento em outro mês/ano exige revisão dos descontos.',
   ].filter(Boolean).join('\n');
 }

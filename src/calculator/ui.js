@@ -1,5 +1,5 @@
 import './calculator.css';
-import { simular, mensagemWhatsApp, WHATSAPP, YEAR } from './model.js';
+import { simular, mensagemWhatsApp, WHATSAPP } from './model.js';
 import { MODALIDADES, ROTULOS_AVISO, parseDataLocal, formatarMoeda } from './vendor/rescisao.js';
 
 const root = document.getElementById('laborCalculator');
@@ -52,7 +52,6 @@ if (root) {
     if (!Number.isFinite(salario) || salario <= 0 || salario > 10000000) return ['Informe um salário bruto válido, maior que zero e de até R$ 10.000.000,00.'];
     if (!inicio || !fim) return ['Preencha as duas datas de trabalho.'];
     if (inicio.getFullYear() < 1950 || inicio > fim) return ['Confira as datas: o início não pode ser depois da saída.'];
-    if (fim.getFullYear() !== YEAR) return [`Esta versão calcula desligamentos em ${YEAR}, com as tabelas desse ano.`];
     if (fim > new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())) return ['A data de saída não pode estar no futuro.'];
     return [];
   }
@@ -68,12 +67,17 @@ if (root) {
   }
 
   function exibir(simulacao) {
-    const { resultado, recebido, diferenca, pagamento, fgtsPeriodo, fgtsIncompleto, fgtsAnterior } = simulacao;
+    const { resultado, recebido, diferenca, pagamento, fgtsPeriodo, fgtsIncompleto, fgtsAnterior, ferias, tributosCompletos } = simulacao;
+    get('calcTotalLabel').textContent = !tributosCompletos ? 'Estimativa antes de impostos' : ferias.parcial ? 'Acerto líquido parcial' : 'Acerto líquido estimado';
     get('calcTotal').textContent = formatarMoeda(resultado.total);
     get('calcPaid').textContent = pagamento === 'incerto' ? 'Não informado' : pagamento === 'nao' ? 'Não recebido' : formatarMoeda(recebido);
     get('calcDifferenceLabel').textContent = diferenca !== null && diferenca < 0 ? 'Recebido acima da estimativa' : 'Diferença estimada';
     get('calcDifference').textContent = diferenca === null ? 'A conferir' : formatarMoeda(Math.abs(diferenca));
-    get('calcMessage').textContent = diferenca === null
+    get('calcMessage').textContent = ferias.parcial
+      ? 'As férias antigas ainda precisam ser conferidas. O valor é parcial; não calculamos uma diferença final enquanto essa informação estiver pendente.'
+      : !tributosCompletos
+        ? 'Não há tabelas de impostos cadastradas para todas as datas deste caso. Exibimos o valor antes de impostos, sem compará-lo ao líquido recebido.'
+      : diferenca === null
       ? 'Confira o demonstrativo e os comprovantes para comparar com a simulação.'
       : diferenca > 0
         ? 'A simulação aponta uma diferença. A conferência dos documentos pode esclarecer os valores.'
@@ -90,14 +94,16 @@ if (root) {
       linha('Total bruto do acerto', resultado.bruto),
       linha('Descontos e adiantamentos considerados', resultado.bruto - resultado.total),
       ...resultado.descontos.filter(v => /^(INSS|IRRF)/.test(v.titulo)).map(v => linha(`Detalhe: ${v.titulo}`, -v.valor)),
-      linha('Acerto líquido estimado', resultado.total),
+      linha(!tributosCompletos ? 'Estimativa antes de impostos' : ferias.parcial ? 'Acerto líquido parcial' : 'Acerto líquido estimado', resultado.total),
       linha(modo === 'registro' ? 'FGTS anterior estimado' : 'Base anterior do FGTS informada', fgtsAnterior),
       ...resultado.fgts.map(v => linha(v.titulo, v.valor)),
     ];
     get('calcBreakdown').replaceChildren(...composicao);
     const observacoes = [
       ...resultado.observacoes,
-      'Férias pendentes devem corresponder somente aos períodos completos ainda não gozados nem pagos. O período antigo dentre dois pendentes é calculado em dobro. Casos com outras datas de férias exigem conferência.',
+      `Férias informadas: ${ferias.descricao}`,
+      'A estimativa de férias considera 30 dias por ano, sem faltas que reduzam esse direito ou afastamentos que alterem a aquisição. Os períodos são contados desde a admissão, com projeção do aviso indenizado.',
+      'Descontos estimados na data da saída. Pagamentos em outro mês/ano, rendimentos acumulados e valores apurados em processo judicial exigem cálculo tributário específico. Não há atualização monetária, juros ou avaliação de prescrição nesta simulação.',
       ...(modo === 'registro' ? ['A existência do vínculo de emprego não é determinada pela calculadora. A estimativa depende do reconhecimento e das provas do caso.', 'O FGTS anterior usa o último salário como constante durante todo o período, incluindo 13º. Não acrescenta novamente salários mensais que já foram pagos.'] : []),
     ];
     get('calcAssumptions').replaceChildren(...observacoes.map(texto => {
@@ -120,6 +126,10 @@ if (root) {
   get('calcEdit').addEventListener('click', () => { mostrarEtapa(2); get('calcModalidade').focus({ preventScroll: true }); });
   get('calcModalidade').addEventListener('change', atualizarAviso);
   get('calcPagamento').addEventListener('change', atualizarPagamento);
+  get('calcFerias').addEventListener('change', () => {
+    const parcial = ['parte', 'incerto'].includes(get('calcFerias').value);
+    get('calcVacationHelp').textContent = parcial ? 'Sem os detalhes das férias antigas, calculamos somente a parte identificável e mostramos que a estimativa está incompleta.' : get('calcFerias').value === 'nunca' ? 'Vamos calcular automaticamente os períodos completos, eventual dobra por falta de concessão no prazo e a parte proporcional.' : 'Consideramos quitadas as férias completas anteriores à saída e calculamos a parte ainda adquirida, inclusive a projeção do aviso.';
+  });
   form.addEventListener('submit', event => {
     event.preventDefault();
     const problemas = validarInicio();

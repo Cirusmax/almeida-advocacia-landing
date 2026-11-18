@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import { simular, mensagemWhatsApp } from '../src/calculator/model.js';
 
 const hoje = new Date(2026, 10, 18);
-const dados = extra => new URLSearchParams({ s: '3000', a: '2025-02-01', d: '2026-10-15', m: 'sem_justa_causa', av: 'indenizado', fv: '0', ad: '0', dp: '0', f: '5000', pagamento: 'sim', recebido: '8000', ...extra });
+const dados = extra => new URLSearchParams({ s: '3000', a: '2025-02-01', d: '2026-10-15', m: 'sem_justa_causa', av: 'indenizado', ferias: 'quitadas', ad: '0', dp: '0', f: '5000', pagamento: 'sim', recebido: '8000', ...extra });
 test('compara somente o líquido do acerto, sem somar FGTS à diferença', () => {
   const r = simular(dados(), 'acerto', hoje);
   assert.equal(r.ok, true);
-  assert.equal(r.resultado.total, 10547.64);
-  assert.equal(r.diferenca, 2547.64);
+  // Gross 10,883.33 less salary INSS 112.50 and 13th INSS 223.18 (eSocial).
+  assert.equal(r.resultado.total, 10547.65);
+  assert.equal(r.diferenca, 2547.65);
   assert.ok(r.fgtsPeriodo > 5000);
 });
 test('FGTS desconhecido fica explicitamente incompleto, não cria depósitos anteriores', () => {
@@ -35,10 +36,10 @@ test('pagamento desconhecido não é interpretado como zero', () => {
 test('acerto ainda não pago compara com zero e recebido maior preserva diferença negativa', () => {
   const nenhum = simular(dados({ pagamento: 'nao', recebido: '' }), 'acerto', hoje);
   assert.equal(nenhum.diferenca, nenhum.resultado.total);
-  assert.equal(simular(dados({ recebido: '20000' }), 'acerto', hoje).diferenca, -9452.36);
+  assert.equal(simular(dados({ recebido: '20000' }), 'acerto', hoje).diferenca, -9452.35);
 });
-test('rejeita datas futuras, ano sem tabela, salário inválido e pagamento inválido', () => {
-  for (const extra of [{ d: '2026-12-01' }, { d: '2025-10-15' }, { s: 'NaN' }, { recebido: 'Infinity' }, { recebido: '' }, { m: 'rescisao_indireta' }]) {
+test('rejeita datas futuras, salário inválido e pagamento inválido', () => {
+  for (const extra of [{ d: '2026-12-01' }, { s: 'NaN' }, { recebido: 'Infinity' }, { recebido: '' }, { m: 'rescisao_indireta' }]) {
     assert.equal(simular(dados(extra), 'acerto', hoje).ok, false);
   }
 });
