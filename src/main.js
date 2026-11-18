@@ -1,4 +1,5 @@
 import './calculator/ui.js';
+import './responsive.js';
 
 // Header shadow on scroll
 const header = document.getElementById('header');
@@ -9,16 +10,30 @@ window.addEventListener('scroll', onScroll, { passive: true });
 // Mobile nav toggle
 const navToggle = document.getElementById('navToggle');
 const nav = document.getElementById('nav');
-navToggle?.addEventListener('click', () => {
-  const isOpen = nav.classList.toggle('is-open');
-  navToggle.setAttribute('aria-expanded', String(isOpen));
-});
+const setMobileMenu = open => {
+  nav?.classList.toggle('is-open', open);
+  navToggle?.setAttribute('aria-expanded', String(open));
+  document.body.classList.toggle('mobile-nav-open', open);
+};
+navToggle?.setAttribute('aria-controls', 'nav');
+navToggle?.addEventListener('click', () => setMobileMenu(!nav.classList.contains('is-open')));
 nav?.querySelectorAll('a').forEach((link) =>
   link.addEventListener('click', () => {
-    nav.classList.remove('is-open');
-    navToggle.setAttribute('aria-expanded', 'false');
+    setMobileMenu(false);
   })
 );
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && nav?.classList.contains('is-open')) {
+    setMobileMenu(false);
+    navToggle?.focus();
+  }
+});
+document.addEventListener('click', event => {
+  if (nav?.classList.contains('is-open') && (!header.contains(event.target) || event.target.closest('a'))) setMobileMenu(false);
+});
+window.matchMedia('(min-width: 1025px)').addEventListener('change', event => {
+  if (event.matches) setMobileMenu(false);
+});
 
 // Reveal on scroll (small, tasteful — no huge scroll distances)
 const revealEls = document.querySelectorAll('.reveal');
