@@ -1,5 +1,5 @@
 import './calculator.css';
-import { simular, mensagemWhatsApp, WHATSAPP } from './model.js';
+import { simular, mensagemWhatsApp, WHATSAPP, AVISO_SEM_REGISTRO } from './model.js';
 import { MODALIDADES, ROTULOS_AVISO, parseDataLocal, formatarMoeda } from './vendor/rescisao.js';
 
 const root = document.getElementById('laborCalculator');
@@ -27,17 +27,28 @@ if (root) {
     erros();
   }
 
-  function atualizarAviso() {
+  function atualizarAviso(reset = false) {
     const select = get('calcAviso');
     const anterior = select.value;
-    select.replaceChildren(...MODALIDADES[get('calcModalidade').value].avisos.map(valor => {
+    const opcoes = modo === 'registro' ? AVISO_SEM_REGISTRO[get('calcModalidade').value]
+      : MODALIDADES[get('calcModalidade').value].avisos.map(valor => [valor, ROTULOS_AVISO[valor]]);
+    select.replaceChildren(...opcoes.map(([valor, rotulo]) => {
       const option = document.createElement('option');
       option.value = valor;
-      option.textContent = ROTULOS_AVISO[valor];
+      option.textContent = rotulo;
       return option;
     }));
-    if ([...select.options].some(option => option.value === anterior)) select.value = anterior;
+    if (!reset && [...select.options].some(option => option.value === anterior)) select.value = anterior;
+    get('calcAvisoLabel').textContent = modo === 'registro' ? 'Como foi sua saída em relação ao aviso?' : 'Aviso prévio';
+    get('calcAvisoField').classList.toggle('calculator-field--full', modo === 'registro');
+    atualizarExplicacaoAviso();
     get('calcFGTSField').hidden = modo === 'registro';
+  }
+
+  function atualizarExplicacaoAviso() {
+    const semAviso = modo === 'registro' && get('calcAviso').value === 'sem_aviso';
+    get('calcAvisoHelp').hidden = !semAviso;
+    get('calcAvisoHelp').textContent = semAviso ? 'Você saiu na hora, sem aviso e sem pagamento por esse período. A simulação inclui o aviso que pode ser devido. Informe no acerto recebido qualquer valor que já tenha recebido.' : '';
   }
 
   function atualizarPagamento() {
@@ -70,6 +81,9 @@ if (root) {
     get('calcTotalLabel').textContent = !tributosCompletos ? 'Estimativa antes de impostos' : ferias.parcial ? 'Acerto líquido parcial' : 'Acerto líquido estimado';
     get('calcTotal').textContent = formatarMoeda(resultado.total);
     get('calcPaid').textContent = pagamento === 'incerto' ? 'Não informado' : pagamento === 'nao' ? 'Não recebido' : formatarMoeda(recebido);
+    get('calcFGTSExtra').hidden = modo !== 'registro';
+    get('calcFGTSExtraValue').textContent = formatarMoeda(fgtsPeriodo);
+    get('calcFGTSResult').hidden = modo === 'registro';
     get('calcDifferenceLabel').textContent = diferenca !== null && diferenca < 0 ? 'Recebido acima da estimativa' : 'Diferença estimada';
     get('calcDifference').textContent = diferenca === null ? 'A conferir' : formatarMoeda(Math.abs(diferenca));
     get('calcMessage').textContent = ferias.parcial
@@ -120,12 +134,13 @@ if (root) {
     modo = button.dataset.calcMode;
     root.querySelectorAll('[data-calc-mode]').forEach(other => other.setAttribute('aria-pressed', String(other === button)));
     get('calcRegistroNote').hidden = modo !== 'registro';
-    atualizarAviso();
+    atualizarAviso(true);
     mostrarEtapa(1);
   }));
   root.querySelector('[data-calc-back]').addEventListener('click', () => { mostrarEtapa(1); get('calcSalario').focus({ preventScroll: true }); });
   get('calcEdit').addEventListener('click', () => { mostrarEtapa(2); get('calcModalidade').focus({ preventScroll: true }); });
-  get('calcModalidade').addEventListener('change', atualizarAviso);
+  get('calcModalidade').addEventListener('change', () => atualizarAviso());
+  get('calcAviso').addEventListener('change', atualizarExplicacaoAviso);
   get('calcPagamento').addEventListener('change', atualizarPagamento);
   function atualizarFerias() {
     const resposta = get('calcFerias').value;

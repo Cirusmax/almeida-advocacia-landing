@@ -4,6 +4,24 @@ import { calcularFerias } from './vacations.js';
 import { tributosPara } from './historical-taxes.js';
 
 export const WHATSAPP = '5532999055427';
+export const AVISO_SEM_REGISTRO = {
+  sem_justa_causa: [
+    ['sem_aviso', 'Não tive aviso', 'Fui dispensado na hora, sem aviso e sem pagamento'],
+    ['trabalhado', 'Continuei trabalhando', 'Continuei trabalhando depois que fui avisado'],
+    ['indenizado', 'Recebi pelo aviso', 'Recebi pelo aviso sem precisar trabalhar'],
+  ],
+  acordo: [
+    ['sem_aviso', 'Não tive aviso', 'Saí na hora e não recebi pelo aviso'],
+    ['trabalhado', 'Continuei trabalhando', 'Continuei trabalhando depois do acordo'],
+    ['indenizado', 'Recebi pelo aviso', 'Recebi pelo aviso sem precisar trabalhar'],
+  ],
+  pedido_demissao: [
+    ['nao_cumprido', 'Saí sem cumprir aviso'],
+    ['trabalhado', 'Trabalhei o aviso', 'Continuei trabalhando durante o aviso'],
+    ['dispensado', 'A empresa me liberou de cumprir o aviso'],
+  ],
+  justa_causa: [['nenhum', 'Saí sem aviso']],
+};
 
 // Constant salary, ordinary CLT employee (8%). No correction, interest or variable pay.
 // Termination-month salary and termination 13th are already counted by the vendor.
@@ -30,6 +48,12 @@ export function simular(campos, modo = 'acerto', hoje = new Date()) {
   // The visible form supports ordinary indefinite-term contracts only.
   if (!['sem_justa_causa', 'pedido_demissao', 'acordo', 'justa_causa'].includes(dados.get('m'))) {
     return { ok: false, erros: ['Escolha como terminou o trabalho.'] };
+  }
+  const avisoRelatado = dados.get('av');
+  if (modo === 'registro' && avisoRelatado === 'sem_aviso' && ['sem_justa_causa', 'acordo'].includes(dados.get('m'))) {
+    // Reported fact: no notice worked and no payment. The engine calculates the
+    // indemnity potentially due; it must not treat the lack of notice as zero entitlement.
+    dados.set('av', 'indenizado');
   }
   const desconheceFGTS = modo === 'acerto' && !(dados.get('f') || '').trim();
   if (modo === 'registro' || desconheceFGTS) dados.set('f', '0');
@@ -83,13 +107,17 @@ export function simular(campos, modo = 'acerto', hoje = new Date()) {
   const ferias = calcularFerias(entrada, respostaFerias, pendencias);
   const tributos = tributosPara(entrada, dataEfetiva(entrada, diasDeAviso(entrada)));
   const resultado = calcularRescisao(entrada, { ferias: ferias.verbas, tributos });
+  if (modo === 'registro' && avisoRelatado === 'sem_aviso') {
+    const aviso = resultado.verbas.find(v => v.titulo === 'Aviso prévio indenizado');
+    if (aviso) aviso.titulo = 'Aviso não recebido: indenização estimada';
+  }
   if (!tributos.completo) {
     resultado.observacoes = resultado.observacoes.filter(texto => !/IRRF|INSS/.test(texto));
     resultado.observacoes.push('Não há tabela de impostos cadastrada para todas as competências deste caso. O resultado é antes de impostos e não é comparado ao líquido recebido.');
   }
   const comparavel = tributos.completo && !ferias.parcial;
   return {
-    ok: true, entrada, resultado, modo, pagamento,
+    ok: true, entrada, resultado, modo, pagamento, avisoRelatado,
     recebido: pagamento === 'incerto' ? null : recebido,
     diferenca: pagamento === 'incerto' || !comparavel ? null : arredondar(resultado.total - recebido),
     fgtsAnterior,
@@ -100,16 +128,19 @@ export function simular(campos, modo = 'acerto', hoje = new Date()) {
 }
 
 export function mensagemWhatsApp(simulacao) {
-  const { entrada, resultado, modo, recebido, diferenca, pagamento, fgtsPeriodo, fgtsEstimado, ferias, tributosCompletos } = simulacao;
+  const { entrada, resultado, modo, recebido, diferenca, pagamento, fgtsPeriodo, fgtsEstimado, ferias, tributosCompletos, avisoRelatado } = simulacao;
   const moeda = n => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const data = d => d.toLocaleDateString('pt-BR');
+  const relatoAviso = AVISO_SEM_REGISTRO[entrada.modalidade].find(([valor]) => valor === avisoRelatado);
   return [
     'Olá! Usei a calculadora do site Almeida Advocacia e gostaria de uma análise.',
     `Situação: ${modo === 'registro' ? 'trabalho sem carteira assinada (possível vínculo)' : 'conferência de acerto'}.`,
     `Período: ${data(entrada.admissao)} a ${data(entrada.desligamento)}.`,
     `Último salário bruto: ${moeda(entrada.salario)}.`,
     `Saída informada: ${MODALIDADES[entrada.modalidade].rotulo}.`,
-    `Aviso: ${entrada.tipoAviso}. Férias: ${ferias.descricao}`,
+    `Aviso relatado: ${modo === 'registro' ? relatoAviso?.[2] || relatoAviso?.[1] || entrada.tipoAviso : entrada.tipoAviso}.`,
+    ...(avisoRelatado === 'sem_aviso' ? ['O aviso não foi trabalhado nem pago. A simulação inclui a indenização possivelmente devida.'] : []),
+    `Férias: ${ferias.descricao}`,
     `${ferias.parcial ? 'Estimativa parcial' : 'Acerto estimado'} ${tributosCompletos ? 'após descontos estimados' : 'antes de impostos'}: ${moeda(resultado.total)}.`,
     pagamento === 'incerto' ? 'Não sei informar o valor líquido recebido.' : pagamento === 'nao' ? 'Ainda não recebi o acerto.' : `Acerto líquido recebido: ${moeda(recebido)}.`,
     diferenca === null ? '' : `Diferença estimada (pode ser negativa): ${moeda(diferenca)}.`,

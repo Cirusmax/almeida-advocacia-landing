@@ -56,6 +56,14 @@ um cálculo judicial nem à análise de todos os fatos de cada contrato.
 - Base da multa do FGTS separada do depósito de FGTS do aviso.
 - Férias incertas e tabela tributária ausente não geram comparação enganosa com líquido.
 - Separação do FGTS e do pagamento líquido da rescisão.
+- No modo sem registro, o cenário inicial é a dispensa sem aviso e sem pagamento,
+  descrito como fato relatado pelo visitante. Internamente, a dispensa sem justa
+  causa considera a indenização de aviso que pode ser devida e sua projeção;
+  não a marca como recebida. O aviso trabalhado e o pagamento sem trabalho continuam
+  selecionáveis. Pedido de demissão, acordo e justa causa mantêm suas próprias regras.
+- O resultado sem registro destaca “Mais FGTS estimado” abaixo do acerto. O valor
+  inclui depósitos estimados e eventual multa, permanece separado da comparação
+  do acerto e depende da análise/reconhecimento do vínculo. Não é saldo confirmado.
 
 ## Limitações materiais
 

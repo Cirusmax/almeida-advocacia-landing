@@ -35,6 +35,8 @@
 .calculator-result__line--difference > strong { font-size: 1.6rem; }
 .calculator-result__message { font-size: .9rem; margin: 12px 0 18px; }
 .calculator-result__fgts { font-size: .875rem; padding: 14px 0; border-top: 1px solid var(--border); color: var(--text-soft); margin: 0 0 16px; }
+#calcFGTSExtra { margin: 0 0 18px; }
+#calcFGTSExtra .calculator-result__line > span { color: var(--ink); }
 .calculator-result__fgts strong { color: var(--ink); font-weight: 400; }
 .calculator-breakdown { margin: 16px 0; font-size: .875rem; }
 .calculator-breakdown summary { cursor: pointer; color: var(--ink); }
