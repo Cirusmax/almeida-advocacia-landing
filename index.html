@@ -61,7 +61,7 @@
     }
   }
   </script>
-  <script type="module" crossorigin src="./assets/main-Bw5ZrMYu.js"></script>
+  <script type="module" crossorigin src="./assets/main-CF2o_fJu.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/main-SlX7T-Ll.css">
 </head>
 <body>
@@ -176,17 +176,17 @@
                 <div class="calculator-fields">
                   <div class="calculator-field calculator-field--full"><label for="calcSalario">Último salário bruto (R$)</label><input id="calcSalario" name="s" type="number" min="0.01" max="10000000" step="0.01" inputmode="decimal" placeholder="Ex.: 2500,00" required></div>
                   <div class="calculator-field"><label for="calcAdmissao">Quando começou?</label><input id="calcAdmissao" name="a" type="date" min="1950-01-01" required></div>
-                  <div class="calculator-field"><label for="calcSaida">Quando terminou?</label><input id="calcSaida" name="d" type="date" min="2026-01-01" aria-describedby="calculatorYearNote" required></div>
+                  <div class="calculator-field"><label for="calcSaida">Quando terminou?</label><input id="calcSaida" name="d" type="date" min="1950-01-01" aria-describedby="calculatorYearNote" required></div>
                 </div>
                 <button class="btn btn--primary btn--block" type="submit">Continuar</button>
-                <p class="calculator-note" id="calculatorYearNote">Para saídas em 2026. Seus dados de cálculo ficam no navegador até você escolher compartilhá-los pelo WhatsApp.</p>
+                <p class="calculator-note" id="calculatorYearNote">Pode informar uma saída de anos anteriores. Valores nominais da rescisão, sem atualização judicial. Seus dados de cálculo ficam no navegador até você escolher compartilhá-los.</p>
               </div>
               <div id="calculatorStepTwo" hidden>
                 <div class="calculator-step"><button type="button" class="calculator-back" data-calc-back>Voltar aos dados</button><span>2 de 2</span></div>
                 <div class="calculator-fields">
                   <div class="calculator-field calculator-field--full"><label for="calcModalidade">Como terminou o trabalho?</label><select id="calcModalidade" name="m"><option value="sem_justa_causa">Demissão sem justa causa</option><option value="pedido_demissao">Pedido de demissão</option><option value="acordo">Acordo entre as partes</option><option value="justa_causa">Dispensa por justa causa</option></select></div>
                   <div class="calculator-field"><label for="calcAviso">Aviso prévio</label><select id="calcAviso" name="av"><option value="indenizado">Indenizado</option><option value="trabalhado">Trabalhado</option></select></div>
-                  <div class="calculator-field"><label for="calcFerias">Períodos completos de férias pendentes</label><select id="calcFerias" name="fv"><option value="0">Nenhum</option><option value="1">Um período</option><option value="2">Dois períodos</option></select><small>Períodos de 12 meses completos ainda não gozados nem pagos. Acima de dois, peça análise.</small></div>
+                  <div class="calculator-field calculator-field--full"><label for="calcFerias">Você tirou e recebeu férias nesse trabalho?</label><select id="calcFerias" name="ferias" required><option value="">Selecione sua situação</option><option value="nunca">Nunca tirei nem recebi férias</option><option value="quitadas">Tirei e recebi tudo que estava pendente</option><option value="parte">Ainda ficou alguma parte pendente</option><option value="incerto">Não sei informar</option></select><small id="calcVacationHelp">Se nunca tirou nem recebeu, calculamos pelas datas. Se faltarem informações, o resultado será identificado como parcial.</small></div>
                   <div class="calculator-field calculator-field--full"><label for="calcPagamento">Já recebeu o acerto?</label><select id="calcPagamento" name="pagamento"><option value="sim">Sim, quero comparar</option><option value="nao">Ainda não recebi</option><option value="incerto">Não sei informar o valor</option></select></div>
                   <div class="calculator-field calculator-field--full" id="calcRecebidoField"><label for="calcRecebido">Valor líquido recebido no acerto (R$)</label><input id="calcRecebido" name="recebido" type="number" min="0" max="10000000" step="0.01" inputmode="decimal" placeholder="Ex.: 1800,00"><small>Não inclua saque de FGTS nem salários de meses anteriores.</small></div>
                 </div>
@@ -201,9 +201,9 @@
             </form>
             <div id="calculatorResult" hidden>
               <div class="calculator-step"><button type="button" class="calculator-back" id="calcEdit">Rever os dados</button><span>Estimativa</span></div>
-              <div aria-live="polite" aria-atomic="true"><div class="calculator-result__line"><span>Acerto líquido estimado</span><strong id="calcTotal"></strong></div><div class="calculator-result__line"><span>Acerto recebido</span><strong id="calcPaid"></strong></div><div class="calculator-result__line calculator-result__line--difference"><span id="calcDifferenceLabel">Diferença estimada</span><strong id="calcDifference"></strong></div><p class="calculator-result__message" id="calcMessage"></p></div>
+              <div aria-live="polite" aria-atomic="true"><div class="calculator-result__line"><span id="calcTotalLabel">Acerto líquido estimado</span><strong id="calcTotal"></strong></div><div class="calculator-result__line"><span>Acerto recebido</span><strong id="calcPaid"></strong></div><div class="calculator-result__line calculator-result__line--difference"><span id="calcDifferenceLabel">Diferença estimada</span><strong id="calcDifference"></strong></div><p class="calculator-result__message" id="calcMessage"></p></div>
               <p class="calculator-result__fgts" id="calcFGTSResult"></p>
-              <details class="calculator-breakdown"><summary>Ver composição e premissas</summary><dl id="calcBreakdown"></dl><ul id="calcAssumptions"></ul><p class="calculator-note">Referências: <a href="https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452.htm" target="_blank" rel="noopener">CLT</a>, <a href="https://www.gov.br/inss/pt-br/direitos-e-deveres/inscricao-e-contribuicao/tabela-de-contribuicao-mensal/" target="_blank" rel="noopener">INSS 2026</a> e <a href="https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2026" target="_blank" rel="noopener">IRRF 2026</a>.</p></details>
+              <details class="calculator-breakdown"><summary>Ver composição e premissas</summary><dl id="calcBreakdown"></dl><ul id="calcAssumptions"></ul><p class="calculator-note">Referências: <a href="https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452compilado.htm" target="_blank" rel="noopener">CLT</a>, <a href="https://www.gov.br/esocial/pt-br/documentacao-tecnica/manuais/mos-s-1-3-consolidada-ate-a-no-s-1-3-08-2026-com-marcacoes.pdf" target="_blank" rel="noopener">eSocial</a> e tabelas de IRRF: <a href="https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/copy_of_2024" target="_blank" rel="noopener">2024</a>, <a href="https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2025" target="_blank" rel="noopener">2025</a> e <a href="https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/tabelas/2026" target="_blank" rel="noopener">2026</a>.</p></details>
               <a class="btn btn--primary btn--block calculator-contact" id="calcContact" target="_blank" rel="noopener" href="https://wa.me/5532999055427">Analisar meu acerto</a>
               <p class="calculator-note">O botão abre o WhatsApp com o resumo para você revisar antes de enviar. Não há envio automático.</p>
               <p class="calculator-note">Estimativa simplificada, sem garantia de valores a receber. Não inclui horas extras, adicionais, médias variáveis, salários e 13º de anos anteriores em atraso, juros ou regras de convenções coletivas. Destina-se a empregado CLT comum, com contrato por prazo indeterminado.</p>
